@@ -1,21 +1,15 @@
-FROM jenkinsci/blueocean:latest
+
+
+FROM jenkins/jenkins
 
 ENV JAVA_OPTS="-Djenkins.install.runSetupWizard=false"
-
-ARG GIT_COMMIT=unspecified
-LABEL git_commit=$GIT_COMMIT
-
-# Run this command to build the image locally:
-## docker image build --no-cache --tag shazchaudhry/docker-jenkins:latest --build-arg GIT_COMMIT=$(git log -1 --format=%H) .
-# Once the image has been build using the above command then run this command below to find git commit:
-## docker inspect shazchaudhry/docker-jenkins:latest | jq '.[].ContainerConfig.Labels'
 
 # Configure Jenkins
 COPY config/*.xml $JENKINS_HOME/
 COPY config/*.groovy /usr/share/jenkins/ref/init.groovy.d/
 
 # Once jenkins is running and configured, run the following command to find the list of plugins installed:
-##  curl -s -k "http://admin:admin@node1/jenkins/pluginManager/api/json?depth=1" | jq -r '.plugins[].shortName' | tee plugins.txt
+##  curl -s -k "http://admin:admin@localhost:8080/pluginManager/api/json?depth=1" | jq -r '.plugins[].shortName' | tee plugins.txt
 RUN /usr/local/bin/install-plugins.sh \
   ace-editor \
   ant \
@@ -100,7 +94,6 @@ RUN /usr/local/bin/install-plugins.sh \
   ssh-slaves \
   structs \
   subversion \
-  swarm \
   timestamper \
   token-macro \
   variant \
@@ -117,3 +110,20 @@ RUN /usr/local/bin/install-plugins.sh \
   workflow-step-api \
   workflow-support \
   ws-cleanup
+
+USER root
+
+# Install Docker from official repo
+RUN apt-get update -qq && \
+    apt-get install -qqy apt-transport-https ca-certificates curl gnupg2 software-properties-common && \
+    curl -fsSL https://download.docker.com/linux/debian/gpg | apt-key add - && \
+    apt-key fingerprint 0EBFCD88 && \
+    add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/debian $(lsb_release -cs) stable" && \
+    apt-get update -qq && \
+    apt-get install -qqy docker-ce && \
+    usermod -aG docker jenkins && \
+    chown -R jenkins:jenkins $JENKINS_HOME/
+
+USER jenkins
+
+VOLUME [$JENKINS_HOME, "/var/run/docker.sock"]
